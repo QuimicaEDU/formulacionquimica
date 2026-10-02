@@ -4457,7 +4457,7 @@ function saveSession(v){try{sessionStorage.setItem(SESSION,JSON.stringify(v))}ca
 function clearSession(){try{sessionStorage.removeItem(SESSION)}catch(e){}}
 function token(){return st.session?.access_token||""}
 function valid(){return !!token()&&Number(st.session?.expires_at||0)*1000>Date.now()+30000}
-const confirmationUrl="https://quimicaedu.github.io/formulacionquimica/?docente=confirmacion";
+const confirmationUrl="https://quimicaedu.eu/?docente=confirmacion";
 async function auth(path,body){if(path==='/auth/v1/signup'||path==='/auth/v1/resend')path+='?redirect_to='+encodeURIComponent(confirmationUrl);const r=await fetch(U+path,{method:"POST",headers:{"Content-Type":"application/json","apikey":K},body:JSON.stringify(body)}),t=await r.text();let j={};try{j=t?JSON.parse(t):{}}catch(e){}if(!r.ok)throw new Error(j.error_description||j.msg||j.message||j.hint||j.details||j.code||("HTTP "+r.status));return j}
 async function resendConfirmation(){const email=$("fiTeacherEmail")?.value.trim();if(!email){msg("Introduce el correo de tu cuenta para reenviar la confirmación.");return}const b=$("fiTeacherResendConfirmation");b.disabled=true;try{await auth('/auth/v1/resend',{type:'signup',email});msg("Si tu cuenta necesita confirmación, recibirás un nuevo correo. Usa únicamente el enlace más reciente y después inicia sesión.")}catch(e){msg("No se ha podido reenviar la confirmación: "+e.message)}finally{b.disabled=false}}
 async function rpc(name,body){
