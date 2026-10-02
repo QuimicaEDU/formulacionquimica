@@ -1596,6 +1596,7 @@ body :is(button,input,select,textarea,summary):focus-visible{outline:3px solid c
 <label class="fi-gate-label">Contraseña<input autocomplete="current-password" class="fi-code-input" id="fiTeacherPassword" placeholder="••••••••" type="password"/></label>
 <label class="fi-gate-label" hidden="" id="fiTeacherNameWrap">Nombre<input autocomplete="name" class="fi-code-input" id="fiTeacherName" placeholder="Nombre del profesor/a"/></label>
 <div class="fi-gate-actions"><button class="fi-primary" id="fiTeacherLogin" type="button">ENTRAR</button><button class="fi-secondary" id="fiTeacherSignup" type="button">CREAR CUENTA</button></div>
+<button class="fi-secondary" id="fiTeacherResendConfirmation" type="button">Reenviar confirmación del correo</button>
 <div aria-live="polite" class="fi-gate-error" id="fiTeacherAuthMsg"></div>
 </div>
 </div>
@@ -4444,7 +4445,9 @@ function saveSession(v){try{sessionStorage.setItem(SESSION,JSON.stringify(v))}ca
 function clearSession(){try{sessionStorage.removeItem(SESSION)}catch(e){}}
 function token(){return st.session?.access_token||""}
 function valid(){return !!token()&&Number(st.session?.expires_at||0)*1000>Date.now()+30000}
-async function auth(path,body){const r=await fetch(U+path,{method:"POST",headers:{"Content-Type":"application/json","apikey":K},body:JSON.stringify(body)}),t=await r.text();let j={};try{j=t?JSON.parse(t):{}}catch(e){}if(!r.ok)throw new Error(j.error_description||j.msg||j.message||j.hint||j.details||j.code||("HTTP "+r.status));return j}
+const confirmationUrl="https://quimicaedu.github.io/formulacionquimica/";
+async function auth(path,body){if(path==='/auth/v1/signup'||path==='/auth/v1/resend')path+='?redirect_to='+encodeURIComponent(confirmationUrl);const r=await fetch(U+path,{method:"POST",headers:{"Content-Type":"application/json","apikey":K},body:JSON.stringify(body)}),t=await r.text();let j={};try{j=t?JSON.parse(t):{}}catch(e){}if(!r.ok)throw new Error(j.error_description||j.msg||j.message||j.hint||j.details||j.code||("HTTP "+r.status));return j}
+async function resendConfirmation(){const email=$("fiTeacherEmail")?.value.trim();if(!email){msg("Introduce el correo de tu cuenta para reenviar la confirmación.");return}const b=$("fiTeacherResendConfirmation");b.disabled=true;try{await auth('/auth/v1/resend',{type:'signup',email});msg("Si tu cuenta necesita confirmación, recibirás un nuevo correo. Usa únicamente el enlace más reciente y después inicia sesión.")}catch(e){msg("No se ha podido reenviar la confirmación: "+e.message)}finally{b.disabled=false}}
 async function rpc(name,body){
   window.fiAccess?.require(name,body||{},'teacher');
   if(!token())throw new Error("Sesión docente no encontrada.");
@@ -4632,7 +4635,17 @@ async function loadArchived(){const box=$("fiArchivedClasses");if(!box)return;bo
 async function restore(id){if(!id)return;const m=$("fiClassManageMsg");if(m)m.textContent="Restaurando…";try{const c=await rpc("restore_class",{p_class_id:id});if(m)m.textContent="Clase restaurada correctamente.";await loadClasses(c?.id);await loadArchived()}catch(e){if(m)m.textContent="No se ha podido restaurar la clase: "+(e?.message||"")}}
 function bind(){if(st.bound)return;st.bound=true;st.session=readSession();$("fiTeacherEntry")?.addEventListener("click",()=>{show();ui()});$("fiTeacherClose")?.addEventListener("click",close);$("fiTeacherLogin")?.addEventListener("click",login);$("fiTeacherSignup")?.addEventListener("click",()=>{const w=$("fiTeacherNameWrap");if(w)w.hidden=false;signup()});$("fiTeacherLogout")?.addEventListener("click",()=>{st.session=null;clearSession();window.fiAccess.reset();ui();msg("Sesión docente cerrada.")});$("fiCreateClass")?.addEventListener("click",createClass);$("fiTeacherClassSelect")?.addEventListener("change",dashboard);$("fiTeacherDays")?.addEventListener("change",async()=>{await dashboard();if(st.student?.student?.id)await loadStudent(st.student.student.id)});$("fiTeacherRefresh")?.addEventListener("click",async()=>{await dashboard();await window.fiTeacherLoadAssignments?.()});$("fiGenerateReviewInorganic")?.addEventListener("click",()=>generate("inorganic"));$("fiGenerateReviewOrganic")?.addEventListener("click",()=>generate("organic"));$("fiGenerateReviewAll")?.addEventListener("click",()=>generate(""));$("fiGenerateExam")?.addEventListener("click",showExam);$("fiTeacherStudents")?.addEventListener("click",e=>{if(e.target.closest("[data-close-student]")){const d=e.target.closest(".fi-student-inline-detail"),b=d?.parentElement?.querySelector(".fi-student-row");if(d){d.classList.remove("fi-open");d.hidden=true}if(b){b.classList.remove("fi-expanded");b.setAttribute("aria-expanded","false")}st.student=null;return}const x=e.target.closest("[data-student-id]");if(x)loadStudent(x.dataset.studentId)});$("fiReviewPlan")?.addEventListener("click",e=>{if(e.target.closest("#fiPrintReview"))print()});$("fiExamPlan")?.addEventListener("click",e=>{if(e.target.closest("#fiPrintExam"))printExam()});$("fiTeacherManageClass")?.addEventListener("click",()=>{const o=$("fiTeacherClassSelect")?.selectedOptions?.[0];if(!o?.value){classMsg("Selecciona una clase antes de abrir la gestión.");return}$("fiManageClassTitle").textContent=o.textContent;$("fiManageClassMeta").textContent="Clase seleccionada. Puedes archivarla o eliminarla definitivamente.";$("fiTeacherClassManager").hidden=false;loadArchived()});$("fiManageClassClose")?.addEventListener("click",()=>{$("fiTeacherClassManager").hidden=true});$("fiArchiveClass")?.addEventListener("click",archive);$("fiDeleteClass")?.addEventListener("click",()=>del());$("fiArchivedClasses")?.addEventListener("click",e=>{const r=e.target.closest(".fi-restore-class"),d=e.target.closest(".fi-delete-archived");if(r)restore(r.dataset.id);if(d)del(d.dataset.id,d.dataset.name)});$("fiArchivedDetails")?.addEventListener("toggle",e=>{if(e.target.open)loadArchived()});}
 function start(){bind();const params=new URLSearchParams(location.search),checkout=params.get('checkout');if(['success','cancelled','account'].includes(checkout)){show();ui().then(()=>{const message=$("fiLicenseMessage");if(message)message.textContent=checkout==='success'?"Estamos comprobando el pago. La licencia se activará cuando llegue su confirmación; pulsa Actualizar si aún no aparece.":checkout==='cancelled'?"Compra cancelada. Puedes retomarla cuando quieras.":"Consulta aquí el estado de tu licencia."});params.delete('checkout');history.replaceState(null,'',location.pathname+(params.size?'?'+params.toString():'')+location.hash)}}
-if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start);else start();
+function confirmationReturn(){
+  $('fiTeacherResendConfirmation')?.addEventListener('click',resendConfirmation);
+  const fragment=new URLSearchParams(location.hash.slice(1));
+  if(!fragment.has('error')&&!fragment.has('access_token'))return;
+  const failed=fragment.has('error');
+  // La confirmación ya la verifica Supabase. Se elimina el token de la URL y se pide contraseña.
+  history.replaceState(null,'',location.pathname+location.search);
+  show();ui().then(()=>msg(failed?'El enlace de confirmación no es válido o ha caducado. Introduce tu correo y pulsa Reenviar confirmación del correo.':'Correo confirmado. Inicia sesión con tu correo y contraseña para continuar.'));
+}
+function initialize(){start();confirmationReturn()}
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",initialize);else initialize();
 })();
 
 </script>
